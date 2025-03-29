@@ -8,6 +8,7 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
 });
+//
 pool.query('SELECT NOW()')
   .then(() => console.log('Database connected successfully'))
   .catch(err => console.error('Database connection error:', err));
