@@ -10,8 +10,10 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Importation des routes
-const authRoutes = require("./routes/auth");
-app.use('/auth', authRoutes);  // ✅ Ça doit être "/auth" et non "/routes/auth"
+const authRoutes1 = require("./routes/auth");
+const authRoutes2 = require("./routes/debtSessions");
+app.use('/auth', authRoutes1);  
+app.use('/debtSessions', authRoutes2);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
