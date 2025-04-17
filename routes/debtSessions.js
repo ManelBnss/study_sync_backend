@@ -45,51 +45,62 @@ router.get('/:student_id/available-sessions/:module_id/:session_type', async (re
   try {
     const { student_id, module_id, session_type } = req.params;
     const result = await pool.query(
-      `SELECT 
-        s.id AS session_id,
-        s."type" AS session_type,
-        dt."day",
-        dt."startTime",
-        dt."endTime",
-        m."name" AS module_name,
-        r.id AS room_id,
-        r."type" AS room_type,
-        r.capacity,
-        CONCAT(p.firstname, ' ', p.lastname) AS professor_name
-      FROM 
-        public."session" s
-      JOIN 
-        public."dateTime" dt ON s.time_id = dt.id
-      JOIN 
-        public."Module" m ON s."Module_id" = m.id
-      JOIN 
-        public."Room" r ON s.room_id = r.id
-      LEFT JOIN 
-        public."Professor" p ON s.prof_id = p.matricule
-      WHERE 
-        s."Module_id" = $1
-        AND s."type" = $2
-        AND NOT EXISTS (
-          SELECT 1 
-          FROM public."session" sn
-          JOIN public."dateTime" dtn ON sn.time_id = dtn.id
-          JOIN public."Student" st ON sn.group_id = st.group_id
-          WHERE 
-            st.matricule = $3
-            AND dtn.id = dt.id
-        )
-        AND NOT EXISTS (
-          SELECT 1 
-          FROM public."Student_DebtSessions" sds2
-          JOIN public."session" s2 ON sds2.session_id = s2.id
-          JOIN public."dateTime" dt2 ON s2.time_id = dt2.id
-          WHERE 
-            sds2.student_id = $3
-            AND dt2.id = dt.id
-        )
-      ORDER BY 
-        dt."day", 
-        dt."startTime"`,
+      `WITH student_debt_sessions AS (
+         SELECT s2.id, s2."type", dt2."day", dt2."startTime", dt2."endTime"
+         FROM public."Student_DebtSessions" sds
+         JOIN public."session" s2 ON sds.session_id = s2.id
+         JOIN public."dayTime" dt2 ON s2.time_id = dt2.id
+         WHERE sds.student_id = $3
+       )
+       SELECT 
+         s.id AS session_id,
+         s."type" AS session_type,
+         dt."day",
+         dt."startTime",
+         dt."endTime",
+         m."name" AS module_name,
+         r.id AS room_id,
+         r."type" AS room_type,
+         r.capacity,
+         CONCAT(p.firstname, ' ', p.lastname) AS professor_name
+       FROM 
+         public."session" s
+       JOIN 
+         public."dayTime" dt ON s.time_id = dt.id
+       JOIN 
+         public."Module" m ON s."Module_id" = m.id
+       JOIN 
+         public."Room" r ON s.room_id = r.id
+       LEFT JOIN 
+         public."Professor" p ON s.prof_id = p.matricule
+       WHERE 
+         s."Module_id" = $1
+         AND s."type" = $2
+         AND NOT EXISTS (
+           -- Check if student already has this exact session type
+           SELECT 1 FROM student_debt_sessions sds 
+           WHERE sds."type" = $2
+         )
+         AND NOT EXISTS (
+           -- Check for time conflicts
+           SELECT 1 FROM student_debt_sessions sds
+           WHERE sds."day" = dt."day"
+           AND sds."startTime" = dt."startTime"
+           AND sds."endTime" = dt."endTime"
+         )
+         AND NOT EXISTS (
+           -- Check if student already has a session at this time
+           SELECT 1 
+           FROM public."session" sn
+           JOIN public."dayTime" dtn ON sn.time_id = dtn.id
+           JOIN public."Student" st ON sn.group_id = st.group_id
+           WHERE 
+             st.matricule = $3
+             AND dtn.id = dt.id
+         )
+       ORDER BY 
+         dt."day", 
+         dt."startTime"`,
       [module_id, session_type, student_id]
     );
     res.json(result.rows);
@@ -98,20 +109,19 @@ router.get('/:student_id/available-sessions/:module_id/:session_type', async (re
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 // Register for a makeup session
 router.post('/:student_id/register-session', async (req, res) => {
   try {
     const { student_id } = req.params;
-    const { session_id, displaycolor } = req.body;
+    const { session_id} = req.body;
 
     // Start transaction
     await pool.query('BEGIN');
 
     // Add to debt sessions table
     await pool.query(
-      'INSERT INTO public."Student_DebtSessions" (student_id, session_id, displaycolor) VALUES ($1, $2, $3)',
-      [student_id, session_id, displaycolor]
+      'INSERT INTO public."Student_DebtSessions" (student_id, session_id) VALUES ($1, $2)',
+      [student_id, session_id]
     );
     // Commit transaction
     await pool.query('COMMIT');
