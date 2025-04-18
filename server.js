@@ -13,10 +13,11 @@ app.use(bodyParser.json());
 const authRoutes1 = require("./routes/auth");
 const authRoutes2 = require("./routes/debtSessions");
 const authRoutes3 = require("./routes/MakeupSession");
+const authRoutes = require('./routes/profauth');
 app.use('/auth', authRoutes1);  
 app.use('/debtSessions', authRoutes2);
 app.use('/MakeupSession', authRoutes3);
-
+app.use('/profauth', authRoutes);
 
 
 
