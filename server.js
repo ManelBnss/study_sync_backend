@@ -6,18 +6,28 @@ require("dotenv").config();
 const app = express();
 
 // Middleware
-app.use(cors());
-app.use(bodyParser.json());
 
+
+
+app.use(cors({
+  origin: true, // Allows all origins (for debugging)
+  credentials: true
+}));
+app.use(bodyParser.json());
 // Importation des routes
 const authRoutes1 = require("./routes/auth");
 const authRoutes2 = require("./routes/debtSessions");
 const authRoutes3 = require("./routes/MakeupSession");
 const authRoutes = require('./routes/profauth');
+const authRoutes4=require("./routes/professormodules");
+const routes5=require('./routes/professorModuleprogress');
 app.use('/auth', authRoutes1);  
 app.use('/debtSessions', authRoutes2);
 app.use('/MakeupSession', authRoutes3);
 app.use('/profauth', authRoutes);
+app.use('/professormodules', authRoutes4);
+app.use('/professorModuleprogress',routes5);
+
 
 
 
