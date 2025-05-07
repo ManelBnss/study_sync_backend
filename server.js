@@ -17,16 +17,23 @@ app.use(bodyParser.json());
 // Importation des routes
 const authRoutes1 = require("./routes/auth");
 const authRoutes2 = require("./routes/debtSessions");
-const authRoutes3 = require("./routes/MakeupSession");
+
 const authRoutes = require('./routes/profauth');
 const authRoutes4=require("./routes/professormodules");
 const routes5=require('./routes/professorModuleprogress');
+const routes6=require('./routes/makeup');
+const routes7=require('./routes/schedule');
+const routes8=require('./routes/session_progress');
+
 app.use('/auth', authRoutes1);  
 app.use('/debtSessions', authRoutes2);
-app.use('/MakeupSession', authRoutes3);
+
 app.use('/profauth', authRoutes);
 app.use('/professormodules', authRoutes4);
 app.use('/professorModuleprogress',routes5);
+app.use('/makeup',routes6);
+app.use('/schedule',routes7);
+app.use('/session_progress',routes8);
 
 
 

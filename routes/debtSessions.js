@@ -44,9 +44,26 @@ router.get('/:student_id/debt-modules', async (req, res) => {
 router.get('/:student_id/available-sessions/:module_id/:session_type', async (req, res) => {
   try {
     const { student_id, module_id, session_type } = req.params;
+    
+    // First check if student already has this session type
+    const existingSessionCheck = await pool.query(
+      `SELECT 1 FROM public."Student_DebtSessions" sds
+       JOIN public."session" s ON sds.session_id = s.id
+       WHERE sds.student_id = $1 AND s."Module_id" = $2 AND s."type" = $3`,
+      [student_id, module_id, session_type]
+    );
+
+    if (existingSessionCheck.rows.length > 0) {
+      return res.status(200).json({ 
+        message: 'You already have a session for this module',
+        hasExistingSession: true 
+      });
+    }
+
+    // If no existing session, proceed with original query
     const result = await pool.query(
       `WITH student_debt_sessions AS (
-         SELECT s2.id, s2."type", dt2."day", dt2."startTime", dt2."endTime"
+         SELECT s2.id, s2."type", dt2."day", dt2."startTime", dt2."endTime",s2."Module_id"
          FROM public."Student_DebtSessions" sds
          JOIN public."session" s2 ON sds.session_id = s2.id
          JOIN public."dayTime" dt2 ON s2.time_id = dt2.id
@@ -77,19 +94,16 @@ router.get('/:student_id/available-sessions/:module_id/:session_type', async (re
          s."Module_id" = $1
          AND s."type" = $2
          AND NOT EXISTS (
-           -- Check if student already has this exact session type
            SELECT 1 FROM student_debt_sessions sds 
-           WHERE sds."type" = $2
+           WHERE sds."Module_id"=$1 AND sds."type" = $2 
          )
          AND NOT EXISTS (
-           -- Check for time conflicts
            SELECT 1 FROM student_debt_sessions sds
            WHERE sds."day" = dt."day"
            AND sds."startTime" = dt."startTime"
            AND sds."endTime" = dt."endTime"
          )
          AND NOT EXISTS (
-           -- Check if student already has a session at this time
            SELECT 1 
            FROM public."session" sn
            JOIN public."dayTime" dtn ON sn.time_id = dtn.id
@@ -103,12 +117,27 @@ router.get('/:student_id/available-sessions/:module_id/:session_type', async (re
          dt."startTime"`,
       [module_id, session_type, student_id]
     );
-    res.json(result.rows);
+
+    if (result.rows.length === 0) {
+      return res.status(200).json({ 
+        message: 'No available sessions found for you', 
+        hasExistingSession: false 
+      });
+    }
+
+    res.json({ 
+      sessions: result.rows,
+      hasExistingSession: false 
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+function formatTime(timeArray) {
+  return timeArray[0].substring(0, 5); // Format HH:MM
+}
 // Register for a makeup session
 router.post('/:student_id/register-session', async (req, res) => {
   try {
